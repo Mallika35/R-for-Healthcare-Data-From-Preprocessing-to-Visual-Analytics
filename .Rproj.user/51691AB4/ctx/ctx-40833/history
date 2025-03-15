@@ -1,0 +1,185 @@
+install_missing <- function(packages) {
+new_packages <- packages[!packages %in% installed.packages()[,"Package"]]
+if(length(new_packages)) install.packages(new_packages)
+}
+install_missing(required_packages)
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(plotly)
+library(RColorBrewer)
+library(htmlwidgets)
+load_and_clean_data <- function(file_path) {
+healthcare_dataset <- read_csv(file_path) %>%
+na.omit() %>%
+distinct() %>%
+mutate(
+Name = str_to_title(str_to_lower(Name)),
+Hospital = trimws(gsub("\\s+", " ", tools::toTitleCase(gsub("\\band\\b", "", Hospital)))),
+Age = as.numeric(Age),
+Billing.Amount = round(Billing.Amount, 2),
+AgeGroup = cut(Age, breaks = c(0, 18, 35, 50, 65, Inf),
+labels = c("0-17", "18-34", "35-49", "50-64", "65+"),
+right = FALSE)
+) %>%
+filter(between(Age, 0, 120)) %>%
+clean_names()
+return(healthcare_dataset)
+}
+create_condition_plot <- function(data) {
+condition_data <- data %>%
+count(medical_condition, name = "total") %>%
+slice_max(total, n = 10)
+ggplot(condition_data, aes(x = reorder(medical_condition, -total), y = total,
+text = paste("Condition:", medical_condition, "\nCases:", total))) +
+geom_col(aes(fill = medical_condition)) +
+scale_fill_brewer(palette = "Set1") +
+labs(title = "Top Medical Conditions", x = NULL, y = "Cases") +
+theme_minimal() +
+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+create_age_distribution <- function(data) {
+age_data <- data %>%
+count(age_group, name = "count")
+ggplot(age_data, aes(x = age_group, y = count,
+text = paste("Age Group:", age_group, "\nCount:", count))) +
+geom_col(aes(fill = age_group)) +
+scale_fill_brewer(palette = "Set2") +
+labs(title = "Age Distribution", x = "Age Group", y = "Count") +
+theme_minimal()
+}
+save_visualization <- function(plot, filename, interactive = TRUE) {
+# Static version
+ggsave(paste0("plots/static/", filename, ".png"), plot,
+width = 10, height = 6, dpi = 300)
+# Interactive version
+if(interactive) {
+htmlwidgets::saveWidget(
+ggplotly(plot, tooltip = "text"),
+paste0("plots/interactive/", filename, ".html")
+)
+}
+}
+run_analysis <- function(data_path) {
+# Create output directories
+dir.create("plots/static", showWarnings = FALSE, recursive = TRUE)
+dir.create("plots/interactive", showWarnings = FALSE, recursive = TRUE)
+# Load and clean data
+clean_data <- load_and_clean_data(data_path)
+# Generate and save plots
+plots <- list(
+conditions = create_condition_plot(clean_data),
+age_groups = create_age_distribution(clean_data)
+)
+walk2(plots, names(plots), ~save_visualization(.x, .y))
+# Additional analyses can be added here
+return(clean_data)
+}
+if(!interactive()) {
+data_path <- "healthcare_dataset.csv"
+if(!interactive()) {
+data_path <- "healthcare_dataset.csv"  # Update with your path
+analysis_results <- run_analysis(data_path)
+}
+if(!interactive()) {
+data_path <- "healthcare_dataset.csv"  # Update with your path
+analysis_results <- run_analysis(data_path)
+}
+View(create_age_distribution)
+View(create_age_distribution)
+library(tidyverse)
+library(plotly)
+library(htmlwidgets)
+library(RColorBrewer)
+library(tidyverse)
+library(plotly)
+library(htmlwidgets)
+library(RColorBrewer)
+create_and_save_plots <- function() {
+# Custom Theme
+custom_theme <- theme_minimal() + theme(
+text = element_text(size = 12, family = "Arial"),
+plot.title = element_text(size = 16, face = "bold"),
+axis.text.x = element_text(angle = 45, hjust = 1)
+)
+# Color Palette
+color_palette <- brewer.pal(9, "Set1")
+# 1. Top 10 Medical Conditions (Static PNG + Interactive HTML)
+condition_overall <- data_clean %>%
+group_by(Medical.Condition) %>%
+summarise(Total = n(), .groups = 'drop') %>%
+arrange(desc(Total)) %>%
+slice(1:10)
+p1_static <- ggplot(condition_overall,
+aes(x = reorder(Medical.Condition, -Total), y = Total,
+fill = Medical.Condition)) +
+geom_bar(stat = "identity") +
+scale_fill_manual(values = color_palette) +
+labs(title = "Top 10 Medical Conditions", x = "Condition", y = "Cases") +
+custom_theme
+# Save static
+ggsave("top_conditions.png", p1_static, width = 10, height = 6, dpi = 300)
+# Save interactive
+p1_interactive <- ggplotly(p1_static, tooltip = c("x", "y", "fill")) %>%
+layout(hoverlabel = list(bgcolor = "white", font = list(size = 12)))
+saveWidget(p1_interactive, "top_conditions.html")
+# 2. Age Group Distribution (Static PNG + Interactive HTML)
+age_distribution <- data_clean %>%
+group_by(AgeGroup) %>%
+summarise(Count = n(), .groups = 'drop')
+p2_static <- ggplot(age_distribution,
+aes(x = AgeGroup, y = Count, fill = AgeGroup)) +
+geom_bar(stat = "identity") +
+scale_fill_manual(values = color_palette) +
+labs(title = "Age Group Distribution", x = "Age Group", y = "Count") +
+custom_theme
+ggsave("age_groups.png", p2_static, width = 8, height = 6, dpi = 300)
+p2_interactive <- ggplotly(p2_static,
+tooltip = c("x", "y")) %>%
+layout(hoverlabel = list(bgcolor = "white"))
+saveWidget(p2_interactive, "age_groups.html")
+# 3. Hospital-Condition Heatmap (Static PNG + Interactive HTML)
+condition_hospital <- data_clean %>%
+group_by(Hospital, Medical.Condition) %>%
+summarise(Count = n(), .groups = 'drop') %>%
+filter(Count > 5)
+p3_static <- ggplot(condition_hospital,
+aes(x = Hospital, y = Medical.Condition, fill = Count)) +
+geom_tile() +
+scale_fill_gradient(low = "#D3E4CD", high = "#344E41") +
+labs(title = "Condition Frequency by Hospital") +
+theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("hospital_heatmap.png", p3_static, width = 12, height = 8, dpi = 300)
+p3_interactive <- ggplotly(p3_static,
+tooltip = c("x", "y", "fill")) %>%
+layout(hoverlabel = list(bgcolor = "white"))
+saveWidget(p3_interactive, "hospital_heatmap.html")
+# 4. Time Trends (If available)
+if("Date.of.Admission" %in% colnames(data_clean)) {
+admission_trend <- data_clean %>%
+mutate(Date = as.Date(Date.of.Admission)) %>%
+group_by(Date) %>%
+summarise(Admissions = n(), .groups = 'drop')
+p4_static <- ggplot(admission_trend, aes(x = Date, y = Admissions)) +
+geom_line(color = "#1F77B4") +
+labs(title = "Admission Trends") +
+custom_theme
+ggsave("admissions_trend.png", p4_static, width = 10, height = 6, dpi = 300)
+p4_interactive <- ggplotly(p4_static,
+tooltip = c("x", "y")) %>%
+layout(hoverlabel = list(bgcolor = "white"))
+saveWidget(p4_interactive, "admissions_trend.html")
+}
+}
+create_and_save_plots()
+# Execute the function
+create_and_save_plots()
+healthcare_dataset <- read.csv("~/Downloads/Data Analysis- R/Data Analysis- R/healthcare_dataset.csv")
+View(healthcare_dataset)
+install.packages(c("tidyverse", "janitor", "lubridate"))
+# Load the packages
+library(tidyverse)  # For data manipulation and visualization
+library(janitor)    # For cleaning column names and data
+library(lubridate)  # For date manipulation
+# View the first few rows of the dataset
+head(data)
